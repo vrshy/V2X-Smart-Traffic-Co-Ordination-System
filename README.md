@@ -1,41 +1,48 @@
-# V2X Smart Traffic Coordination System
+# E-Commerce Sales & Customer Analysis Dashboard (Power BI)
 
-A beginner-friendly Python portfolio demo that generates synthetic traffic data,
-trains a next-step traffic-density regression model, and displays results in Streamlit.
+Interactive Power BI dashboard analyzing e-commerce sales, profit, customers, products, and orders. Data is cleaned in **Power Query** and KPIs are built with **DAX**.
 
-## Files
+## Business questions answered
+- How are sales and profit trending month by month and year over year?
+- Which categories and products make the most profit, and which have weak margins?
+- Who are the top customers, and how many come back to buy again?
+- Which payment methods do customers prefer?
+- How high are return and cancellation rates?
 
-- `simulation.py` — generates `data/traffic_data.csv`.
-- `train_model.py` — evaluates baseline predictions and trains a Random Forest model.
-- `app.py` — launches the interactive Streamlit dashboard.
-- `requirements.txt` — Python dependencies.
+## Dataset
+Synthetic Indian e-commerce data (2023-2025), created for practice:
+| File | Rows | Description |
+|---|---|---|
+| orders.csv | ~4,800 | Order lines: dates, quantity, discount, payment method, status |
+| customers.csv | 500 | Name, city, state, segment |
+| products.csv | 48 | Category, sub-category, cost, price |
 
-## Setup (Windows PowerShell)
+Orders data has deliberate issues (duplicates, text dates, blank discounts, inconsistent payment names) to practise cleaning.
 
-Run these commands from the project folder:
+## Data cleaning (Power Query)
+Removed duplicates, converted text dates, filled blank discounts, standardised payment method text, set correct data types. See `01_PowerQuery_Steps.md`.
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python simulation.py
-python train_model.py
-streamlit run app.py
-```
+## Data model
+Star schema: `Date`, `customers`, `products` (dimensions) linked to `orders` (fact).
 
-If PowerShell blocks activation, use the virtual-environment Python directly:
+## Key DAX measures
+Total Sales, Total Profit, Profit Margin %, Avg Order Value, YoY Growth %, Sales YTD, Return Rate %, Repeat Customer %. Full code in `02_DAX_Measures.md`.
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe simulation.py
-.\.venv\Scripts\python.exe train_model.py
-.\.venv\Scripts\python.exe -m streamlit run app.py
-```
+## Dashboard pages
+1. Sales Overview
+2. Product Performance
+3. Customer Insights
+4. Orders & Payments
 
-## Notes
+*(add screenshots here)*
 
-All traffic data, V2X messages, vehicle positions, and map overlays are illustrative.
-This project does not connect to live traffic systems and must not be used to control
-real traffic signals. Check model MAE against the baselines printed by `train_model.py`;
-lower MAE is better.
+## Key insights
+*(fill in after you build it, e.g. "Electronics gives the highest profit, Books have low sales but the best margin")*
+
+## Tools
+Power BI Desktop, Power Query, DAX
+
+## How to run
+1. Clone the repo
+2. Open the `.pbix` in Power BI Desktop
+3. If the data path breaks: Transform Data > Data source settings > change source to the `data` folder
