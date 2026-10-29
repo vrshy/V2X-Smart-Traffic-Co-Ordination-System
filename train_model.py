@@ -1,112 +1,91 @@
-import os
+"""Train and evaluate a next-step traffic-density prediction model."""
 
+from pathlib import Path
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 
-# ---------------------------------------------------
-# CREATE MODEL FOLDER
-# ---------------------------------------------------
-
-os.makedirs("models", exist_ok=True)
-
-# ---------------------------------------------------
-# LOAD DATA
-# ---------------------------------------------------
-
-df = pd.read_csv("data/traffic_data.csv")
-
-# ---------------------------------------------------
-# ENCODE SIGNAL STATUS
-# ---------------------------------------------------
-
-signal_map = {
-    "RED": 0,
-    "YELLOW": 1,
-    "GREEN": 2
-}
-
-df["Signal_Encoded"] = df["Signal_Status"].map(signal_map)
-
-# ---------------------------------------------------
-# TARGET = NEXT time step's density
-# ---------------------------------------------------
-# FIX: before, the target was the SAME column as a feature
-# (Traffic_Density), so the model just copied the answer
-# (data leakage). Now each row predicts the NEXT row's density.
-# shift(-1) moves the column up by one row.
-
-df["Next_Density"] = df["Traffic_Density"].shift(-1)
-
-# The last row has no "next" value, so drop it
-df = df.dropna(subset=["Next_Density"])
-
-# ---------------------------------------------------
-# FEATURES (what we know NOW)
-# ---------------------------------------------------
+PROJECT_DIR = Path(__file__).resolve().parent
+DATA_FILE = PROJECT_DIR / "data" / "traffic_data.csv"
+MODEL_DIR = PROJECT_DIR / "models"
+MODEL_FILE = MODEL_DIR / "traffic_model.pkl"
 
 FEATURES = [
+    "Time",
     "Vehicle_Count",
     "Traffic_Density",
     "Average_Speed",
     "Emergency_Vehicle",
-    "Signal_Encoded"
+    "Signal_Encoded",
 ]
 
-X = df[FEATURES]
-y = df["Next_Density"]
 
-# ---------------------------------------------------
-# SPLIT DATA (chronological)
-# ---------------------------------------------------
-# For time-ordered data we train on the past and test on the
-# future, so no random shuffling.
+def prepare_data(frame: pd.DataFrame) -> pd.DataFrame:
+    """Add model-ready columns and the next record's density as target."""
+    data = frame.copy()
+    data["Time"] = pd.to_datetime(data["Time"]).astype("int64") // 10**9
+    data["Signal_Encoded"] = data["Signal_Status"].map(
+        {"RED": 0, "YELLOW": 1, "GREEN": 2}
+    ).fillna(0)
+    data["Next_Density"] = data["Traffic_Density"].shift(-1)
+    return data.dropna(subset=["Next_Density"]).reset_index(drop=True)
 
-split_point = int(len(df) * 0.8)
 
-X_train, X_test = X.iloc[:split_point], X.iloc[split_point:]
-y_train, y_test = y.iloc[:split_point], y.iloc[split_point:]
+def main() -> None:
+    if not DATA_FILE.exists():
+        raise FileNotFoundError(
+            f"Traffic data not found: {DATA_FILE}\n"
+            "Run 'python simulation.py' first."
+        )
 
-# ---------------------------------------------------
-# BASELINE (a "dumb" guess to compare against)
-# ---------------------------------------------------
+    raw = pd.read_csv(DATA_FILE)
+    data = prepare_data(raw)
 
-baseline_pred = [y_train.mean()] * len(y_test)
-baseline_mae = mean_absolute_error(y_test, baseline_pred)
+    if len(data) < 20:
+        raise ValueError("At least 20 traffic records are required to train the model.")
 
-# ---------------------------------------------------
-# TRAIN MODEL
-# ---------------------------------------------------
+    split_index = int(len(data) * 0.80)
+    train = data.iloc[:split_index]
+    test = data.iloc[split_index:]
 
-model = RandomForestRegressor(
-    n_estimators=100,
-    random_state=42
-)
+    x_train, y_train = train[FEATURES], train["Next_Density"]
+    x_test, y_test = test[FEATURES], test["Next_Density"]
 
-model.fit(X_train, y_train)
+    model = RandomForestRegressor(
+        n_estimators=150,
+        max_depth=12,
+        min_samples_leaf=2,
+        random_state=42,
+        n_jobs=-1,
+    )
+    model.fit(x_train, y_train)
+    predictions = model.predict(x_test)
 
-# ---------------------------------------------------
-# EVALUATION
-# ---------------------------------------------------
+    mean_baseline = np.full(len(y_test), y_train.mean())
+    carry_forward_baseline = test["Traffic_Density"].to_numpy()
 
-predictions = model.predict(X_test)
-mae = mean_absolute_error(y_test, predictions)
-
-print(f"Baseline MAE (always predict the average): {baseline_mae:.4f}")
-print(f"Model MAE:                                 {mae:.4f}")
-
-if mae >= baseline_mae:
+    print("\nModel evaluation (chronological 80/20 split)")
+    print("-" * 52)
+    print(f"Training rows: {len(train):,}")
+    print(f"Testing rows:  {len(test):,}")
+    print(f"Mean baseline MAE:          {mean_absolute_error(y_test, mean_baseline):.4f}")
     print(
-        "Note: the model is not beating the baseline. "
-        "The simulated data is random each step, so the next "
-        "value is not really predictable."
+        "Carry-forward baseline MAE: "
+        f"{mean_absolute_error(y_test, carry_forward_baseline):.4f}"
+    )
+    print(f"Random Forest MAE:           {mean_absolute_error(y_test, predictions):.4f}")
+    print(
+        "Random Forest RMSE:          "
+        f"{np.sqrt(mean_squared_error(y_test, predictions)):.4f}"
     )
 
-# ---------------------------------------------------
-# SAVE MODEL
-# ---------------------------------------------------
+    MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, MODEL_FILE)
+    print(f"\nSaved model to: {MODEL_FILE}")
+    print("Note: compare the model against both baselines; lower error is better.")
 
-joblib.dump(model, "models/traffic_model.pkl")
 
-print("Traffic AI model trained and saved!")
+if __name__ == "__main__":
+    main()
