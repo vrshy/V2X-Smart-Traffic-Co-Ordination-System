@@ -184,11 +184,5 @@ python -m py_compile simulation.py train_model.py app.py
 ## 👩‍💻 Author
 
 **Varshini Ganesan**
-
 GitHub: [@vrshy](https://github.com/vrshy)
 
----
-
-## 📄 License
-
-No license is specified here. If you intend others to reuse or modify this project, add a license file and update this section accordingly.
