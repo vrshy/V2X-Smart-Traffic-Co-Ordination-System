@@ -133,6 +133,18 @@ Streamlit will display a local URL in the terminal, usually `http://localhost:85
 
 The project compares the Random Forest model with a training-mean baseline and a carry-forward baseline. A more complex model is not automatically better: review the printed results to determine whether it improves on the baselines. Do not claim a performance improvement unless your own run demonstrates it.
 
+## Results (chronological 80/20 split, seed 42)
+
+| Model | MAE | RMSE |
+|---|---|---|
+| Training-mean baseline | 0.1768 | - |
+| Carry-forward baseline | 0.1145 | - |
+| Random Forest | 0.1105 | 0.1374 |
+
+The Random Forest cuts MAE by 37.5% against the training mean but only 3.5% against
+carry-forward, so most of the signal is the previous value. The data is synthetic.
+To reproduce: run `python simulation.py`, then `python train_model.py`.
+
 ## 📊 Dashboard Guide
 
 The dashboard includes:
